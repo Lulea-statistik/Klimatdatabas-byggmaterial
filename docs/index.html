@@ -6,15 +6,15 @@
 </style></head><body>
 <header><div> LULEÅ STATISTIK · KLIMAT OCH BYGGANDE</div><h1>Byggmaterialens klimatpåverkan</h1><p>Skapa en enkel materialförteckning för nyproduktion, jämför olika materialval och se beräknad klimatpåverkan. Värden hämtas från din lokalt inlästa version av Boverkets klimatdatabas.</p><nav><a href="#import">1. Läs in data</a><a href="#kalkyl">2. Bygg din kalkyl</a><a href="#resultat">3. Visualisera</a><a href="#metod">Metod & data</a></nav></header>
 <main>
-<section class="panel" id="import"><h2>1. Läs in Boverkets klimatdatabas</h2>
+<section class="panel" id="import"><h2>1. Materialregister från Boverket</h2><div id="autoStatus" class="note">Hämtar materialregister automatiskt…</div>
 <p class="muted">Ladda ned <a target="_blank" rel="noopener" href="https://www.boverket.se/contentassets/4668ed4cc3da447385788ed30bff7d49/boverkets-klimatdatabas-version-02.07.000-sv-se.xlsx">Boverkets klimatdatabas 02.07.000 (Excel)</a>. Välj sedan filen här. Den läses i din webbläsare och laddas inte upp till någon server.</p>
 <div class="cols"><label>Excel-fil<input type="file" accept=".xlsx,.xls" id="file"></label><label>Blad<select id="sheet" disabled><option>Välj fil först</option></select></label><label>Rubrikrad (1 = första raden)<input id="headerrow" type="number" min="1" value="1"></label></div>
 <div class="tools" style="margin-top:10px"><button id="read" disabled>Läs bladet</button><span class="small" id="sheetInfo"></span></div>
-<details open><summary>Koppla Excel-kolumner</summary><p class="muted">Excel-filer har olika rubrikrader och ibland flera flikar. Ange rätt kolumner nedan. För att undvika felräkningar krävs en klimatfaktor med uttrycklig enhet.</p>
+<details><summary>Avancerat: läs in annan Excel-fil manuellt</summary><p class="muted">Excel-filer har olika rubrikrader och ibland flera flikar. Ange rätt kolumner nedan. För att undvika felräkningar krävs en klimatfaktor med uttrycklig enhet.</p>
 <div class="cols"><label>Materialnamn<select id="colName"></select></label><label>Klimatfaktor A1–A3<select id="colFactor"></select></label><label>Faktorns enhet (t.ex. kg CO₂e/kg)<select id="colUnit"></select></label><label>Alternativ: fast faktor-enhet<input id="fixedUnit" placeholder="kg CO₂e/kg"></label><label>Alternativ: materialkategori<select id="colCategory"></select></label><label>Alternativ: material-ID<select id="colId"></select></label></div><p class="small">Typiskt och konservativt A1–A3-värde kan finnas i olika kolumner: välj det du avser att jämföra och dokumentera valet.</p><button id="apply" disabled>Aktivera materialregister</button></details>
 <div id="importStatus" class="note">Ingen data inläst. Beräknade klimatvärden visas först när ett materialregister har aktiverats.</div></section>
 <section class="panel" id="kalkyl"><h2>2. Bygg din materialkalkyl</h2>
-<div class="cols"><label>Projektnamn<input id="project" value="Nyproduktion – alternativ A"></label><label>Bruttoarea, BTA (m²)<input id="bta" type="number" min="0" step="1" value="1000"></label><label>Visat beräkningsläge<select id="mode"><option value="factor">A1–A3 utifrån vald klimatfaktor</option></select></label></div>
+<div class="cols"><label>Projektnamn<input id="project" value="Nyproduktion – alternativ A"></label><label>Bruttoarea, BTA (m²)<input id="bta" type="number" min="0" step="1" value="1000"></label><label>Val av A1–A3-värde<select id="mode"><option value="typical">Typiskt värde (materialjämförelse)</option><option value="conservative">Konservativt värde (klimatdeklaration)</option></select></label></div>
 <div class="cols" style="margin-top:14px"><label>Hitta material<input id="search" placeholder="Sök material..." disabled></label><label>Välj material<select id="material" disabled></select></label><label>Mängd i faktorns nämnarenhet<input id="qty" type="number" min="0" step="any" value="1000"></label><label>&nbsp;<button id="add" disabled>Lägg till material</button></label></div>
 <p class="muted" id="chosenInfo">Mängden måste anges i samma enhet som klimatfaktorn, exempelvis kg om faktorn uttrycks i kg CO₂e/kg. Ingen automatisk volym-/viktsomräkning görs.</p>
 <div class="tools" style="margin:15px 0"><button class="alt" id="clear">Töm kalkyl</button><button class="alt" id="export">Exportera CSV</button></div>
@@ -30,7 +30,7 @@
 <script>
 "use strict";
 const $=id=>document.getElementById(id),fmt=n=>new Intl.NumberFormat('sv-SE',{maximumFractionDigits:2}).format(n);
-let workbook=null, rawRows=[],headers=[],materials=[],items=[];
+let workbook=null, rawRows=[],headers=[],materials=[],items=[],official=[];
 const colIds=['colName','colFactor','colUnit','colCategory','colId'];
 function notice(s,bad=false){$('importStatus').textContent=s;$('importStatus').className='note '+(bad?'':'ok')}
 function opts(el,list){el.replaceChildren(...list.map(([value,label])=>{let o=document.createElement('option');o.value=value;o.textContent=label;return o}))}
@@ -49,4 +49,25 @@ $('clear').onclick=()=>{items=[];render()};$('bta').oninput=render;
 function safe(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function render(){let rows=items.map(x=>({...x,impact:x.qty*x.factor})),sum=rows.reduce((a,x)=>a+x.impact,0),bta=number($('bta').value);$('total').textContent=items.length?fmt(sum):'–';$('perArea').textContent=items.length&&bta>0?fmt(sum/bta):'–';$('count').textContent=String(rows.length);$('rows').innerHTML=rows.length?rows.map((r,i)=>'<tr><td>'+safe(r.name)+'</td><td>'+fmt(r.qty)+'</td><td>'+fmt(r.factor)+'</td><td>'+safe(r.unit)+'</td><td>'+fmt(r.impact)+'</td><td><button class="alt" data-remove="'+i+'">Ta bort</button></td></tr>').join(''):'<tr><td colspan="6">Lägg till ett material för att börja.</td></tr>';document.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{items.splice(Number(b.dataset.remove),1);render()});let sorted=rows.sort((a,b)=>b.impact-a.impact),max=Math.max(1,...sorted.map(x=>x.impact));$('bars').innerHTML=sorted.length?sorted.map(x=>'<div class="barrow"><span>'+safe(x.name)+'</span><div class="bar"><i style="width:'+100*x.impact/max+'%"></i></div><strong>'+fmt(x.impact)+'</strong></div>').join(''):'Lägg till material för att se diagrammet.';$('shares').innerHTML=sorted.length?sorted.map(x=>'<div class="barrow"><span>'+safe(x.name)+'</span><div class="bar"><i style="width:'+(sum?100*x.impact/sum:0)+'%"></i></div><strong>'+(sum?fmt(100*x.impact/sum):'0')+' %</strong></div>').join(''):'Lägg till material för att se fördelningen.'}
 $('export').onclick=()=>{if(!items.length)return alert('Lägg till material först.');let lines=[['Projekt','Material','Mängd','Klimatfaktor','Faktorens enhet','kg CO2e A1-A3','BTA m2'],...items.map(x=>[$('project').value,x.name,x.qty,x.factor,x.unit,x.qty*x.factor,$('bta').value])];let csv='\ufeff'+lines.map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(';')).join('\r\n');let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='byggmaterial-klimatkalkyl.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)};
+function loadOfficial(mode){
+ materials=official.map((x,i)=>({...x,cat:x.category,id:x.id,i,
+   factor:mode==='typical'?x.typical:x.conservative}))
+   .filter(x=>x.name&&Number.isFinite(x.factor)&&x.factor>=0&&unitOK(x.unit));
+ items=[];updateOptions();render();
+ $('search').disabled=!materials.length;$('material').disabled=!materials.length;$('add').disabled=!materials.length;
+}
+$('mode').onchange=()=>{if(official.length)loadOfficial($('mode').value)};
+async function bootstrap(){
+ try{
+  const r=await fetch('data/materials.json?v='+Date.now(),{cache:'no-store'});
+  if(!r.ok)throw Error('HTTP '+r.status);
+  const d=await r.json();
+  if(!Array.isArray(d.materials)||d.materials.length<150)throw Error('Ofullständig materialdatabas');
+  official=d.materials;
+  loadOfficial($('mode').value);
+  $('autoStatus').textContent=official.length+' material inlästa från Boverkets klimatdatabas, version '+d.version+'. Källa uppdaterad '+(d.retrieved_at_utc||'').slice(0,10)+'.';
+  $('autoStatus').className='note ok';
+ }catch(e){$('autoStatus').textContent='Automatisk dataladdning är inte tillgänglig ännu ('+e.message+'). Du kan läsa in den bifogade Excel-filen manuellt nedan.'}
+}
+bootstrap();
 </script></body></html>
