@@ -17,3 +17,10 @@ Interaktiv svensk klimatkalkyl för nyproduktion, med Boverkets klimatdatabas so
 
 **Källa:** Boverket, [Öppna data – Klimatdatabas](https://www.boverket.se/sv/om-boverket/oppna-data/boverkets-klimatdatabas/), version 02.07.000, publicerad 21 januari 2026.
 
+
+## Automatisk datainläsning (2026-10-22)
+- Boverket tillhandahåller även ett öppet [Klimatdatabas-API](https://api-portal.boverket.se/reference#api=klimatdatabas) i JSON och XML.
+- Webbappen läser nu det versionsmärkta `docs/data/materials.json` när denna fil finns.
+- GitHub Actions `update-materials.yml` hämtar i första steget Boverkets officiella XLSX-distribution **en gång per dag**, kontrollerar kolumnschema och publicerar A1–A3 typiskt/konservativt, A4, A5, enhet, kategori och resurs-ID.
+- En **direkt API-klient är ännu inte inkopplad**. URL:en för exakt resurs-anrop, autentisering och svarsschema måste verifieras mot OpenAPI innan vi ersätter importkällan. Undvik gissade API-anrop.
+- Innan första lyckade GitHub Actions-körningen finns ännu inte `docs/data/materials.json`; webbappen erbjuder då manuell Excel-import som reserv.
